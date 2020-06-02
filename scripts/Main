@@ -1,0 +1,327 @@
+/*
+Hi, hello. ._./
+If you're reading this you're probably in charge of maintaining the bot on The Nexus.
+Look I aint no expret in JS, so if you are: feel free to clean up my messes.
+If you are not and don't have any or much coding experience, don't worry I am here to help.
+*/
+
+//This sets the default prefix for the bot.
+const commands = new discord.command.CommandGroup({
+  defaultPrefix: '?' // If you want a different Prefix for the bot, change this.
+});
+
+/**
+ *
+ * TICKETING STARTS HERE
+ *
+ */
+// Here we define the IDs of the catgeories in which our tickets will be created. To get a categories ID, turn on developer mode in Discord. Then Right click on the category, and copy ID.
+// The IDs need to be in string format, so if you get the raw numbers, put some quotation marks around em " ' ` all work, just make sure it's the same at the start and the end.
+let Support_ID = new Map();
+Support_ID.set('lore', '712017420704940062');
+Support_ID.set('balance', '712017490452021300');
+Support_ID.set('mods', '712017550719975435');
+Support_ID.set('admins', '712017607590412329');
+
+const embed_color = '8578F0';
+const botID = '270148059269300224';
+
+//Here's the actual support command. Try to not mess with it too much.
+commands.on(
+  //This defines the name of the command. Change it to change what people use to call it.
+  { name: 'support' },
+  //ctx Pull information from the context of the called command. i.e. The arguments used when calling the command.
+  (ctx) => ({
+    // String arguments are seperated by spaces. So if you need  a second argument, say priority. you could add another string like; urgency: ctx.string()
+    team: ctx.string(),
+    //textOptional will eat up everything after it and put it in a big ol' string. So make sure to use it last.
+    reason: ctx.textOptional()
+  }),
+
+  //Here is the function itself, this is where all the magic happens.
+  //First we pass the arguments we defined above. Because the reason is optional we have a default value that is given if it's empty.
+  async (message, { team, reason = 'No reason given' }) => {
+    //Getting the Server (called guild by discord) for later use
+    var server = await message.getGuild();
+    //Initializing ID so we can assign it the value of the correct category
+    var ID;
+
+    //Here we prase the first argument to decide in which category we create the channel. Each team has it's own case (or several cases to catch variations)
+    switch (team.toLowerCase()) {
+      //lore team
+      case 'lore':
+        ID = Support_ID.get('lore');
+        break;
+      // balance team
+      case 'balance':
+        ID = Support_ID.get('balance');
+        break;
+      // moderation team
+      case 'mods':
+      case 'moderators':
+      case 'mod':
+      case 'moderator':
+        ID = Support_ID.get('mods');
+        break;
+
+      //administrator team
+      case 'admins':
+      case 'admin':
+      case 'administrator':
+      case 'administrator':
+        ID = Support_ID.get('admins');
+        break;
+
+      //If the argument is none of the above, we give out an error message and exit the command with return
+      default:
+        message.reply(
+          'Error: Please specify which team you are requesting support from: lore, balance, mods or admins'
+        );
+        message.delete();
+        return;
+    }
+
+    // Creating a variable for the user name with indicator which serves as channel name and also shows up in the channel topic.
+    var username_with_discriminator =
+      message.author.username + '-' + message.author.discriminator;
+    var parent_category = await discord.getGuildCategory(ID);
+    var new_permission_overwrites = parent_category.permissionOverwrites;
+    new_permission_overwrites.push({
+      type: discord.GuildChannel.PermissionOverwriteType.MEMBER,
+      id: message.author.id,
+      allow: 3072,
+      deny: 0
+    });
+    //This is where we create the new channel
+    var new_channel = await server.createChannel({
+      //name: unsurprisingly decides the name the new channel will have
+      name: username_with_discriminator,
+      //Type the discord.Channel.Type the channel has (0 is a text channel)
+      type: 0,
+      //The ID of the category this channel is a part of, we figured that out in the switch statement above
+      parentId: ID,
+      //Sets the topic of the channel
+      topic:
+        `Ticket created by ${username_with_discriminator}, Reason given: ` +
+        reason,
+      //We overwrite the permissions to give the user who created the ticket access to the channel (the other permissions are synced with the category the channel is created in)
+      permissionOverwrites: new_permission_overwrites
+    });
+    //Sends a response informing the user that the channel has been created. Also provides a link to the channel.
+    await message.reply(`Ticket has been created! ${new_channel.toMention()}`);
+
+    //we're getting the freshly created channel so we can send a message to it
+    var ticket_channel = await discord.getGuildTextChannel(new_channel.id);
+    //Setting up an embed message to be sent in the ticket channel
+    var Please_Hold_Embed = new discord.Embed()
+      .setTitle('Thank you for submitting a support ticket')
+      .setDescription(
+        `Someone will be with you shortly, please use this time to elaborate further on your issue`
+      )
+      .addField({ name: 'Reason for the ticket: ', value: `${reason}` })
+      .setTimestamp(new Date().toISOString());
+
+    //we're sending the the embded to the ticket channel. Don't worry about the "Object is Possibly null" Error. That should be fine. Probably. Maybe. Ok. I'm not sure. But it has always worked so far.
+    await ticket_channel.sendMessage({
+      content: '',
+      embed: Please_Hold_Embed
+    });
+
+    //Deletes the invoking message to preseve some privacy
+    await message.delete();
+  }
+);
+
+// Command for closing Tickets
+commands.on(
+  { name: 'close' },
+  (ctx) => ({}),
+  async (message) => {
+    //Getting the Server (called guild by discord) for later use
+    let server = await message.getGuild();
+
+    //Getting the channel where the message was posted in
+    var message_channel = await message.getChannel();
+    //Getting the ID of the category the channel is in
+    let parent_id = message_channel.parentId;
+
+    //Looping through the map of IDs of the support categories
+    for (let id of Support_ID.values()) {
+      //Checks if the category mateches one of the support categories
+      if (parent_id == id) {
+        //edits the permissions of the channel
+        message_channel.edit({
+          permissionOverwrites: [
+            { id: server.id, type: 'role', allow: 0, deny: 1024 }
+          ]
+        });
+        // edits the channel name
+        message_channel.edit({ name: 'CLOSED - ' + message_channel.name });
+
+        // sends a message saying the ticket has been closed
+        message.reply('Ticket has been closed.');
+
+        // deletes invoking message
+        await message.delete();
+        return;
+      }
+    }
+    message.reply('This command can only be used in ticket channels.');
+
+    //Deletes the invoking message to preseve some privacy
+    await message.delete();
+  }
+);
+
+/**
+ *
+ * TODO STARTS HERE
+ *
+ *
+ *
+ *
+ *
+ *
+ * //THE DODO STUFF IS STILL IN BETA, IT MAY BREAK AT ANY TIME AND NEEDS REFACTORING BEFORE BEING MADE AVAILABLE TO THE PUBLIC
+ *
+ */
+
+function DefaultEmbed() {
+  const default_embed = new discord.Embed()
+    .setColor(0x8578f0)
+    .setThumbnail({
+      url:
+        'https://cdn.discordapp.com/avatars/716359053609140285/c9354faa693c3364caa20ddb8ba41ba5.png?size=128'
+    })
+    .setDescription('PLACEHOLDER')
+    .setTimestamp(new Date().toISOString())
+    .setFooter({
+      text: 'If there are any issues please contact the bot wranglers.'
+    });
+  return default_embed;
+}
+
+let countKv = new pylon.KVNamespace('Todo');
+
+commands.on(
+  {
+    name: 'todo',
+    filters: [
+      discord.command.filters.hasRole('696071561332916315'),
+      discord.command.filters.isChannelId('695042238899683465')
+    ]
+  },
+  (ctx) => ({
+    content: ctx.text()
+  }),
+
+  async (message, { content }) => {
+    var n = await countKv.transact<number>('count', (prev) => (prev ?? 0) + 1);
+    var embedded_todo = DefaultEmbed();
+    embedded_todo
+      .setTitle('Todo #' + n)
+      .setDescription(content)
+      .addField({
+        name: 'Todo submitted by:',
+        value: message.author.username,
+        inline: true
+      })
+      .addField({
+        name: 'Todo claimed by:',
+        value: '​',
+        inline: true
+      })
+      .addField({
+        name: 'Status: ',
+        value: 'unclaimed',
+        inline: true
+      })
+      .setFooter({
+        text:
+          'React with ✋ to claim this task. React with ✅ to mark it as complete. React with ❌ to delete it.'
+      });
+    const embed = await message.reply(embedded_todo);
+    await embed.addReaction('✋');
+    await embed.addReaction('✅');
+    await embed.addReaction('❌');
+    message.delete();
+  }
+);
+
+//TODO properly implement promise handling for now just ignore the "might be null" warnings.
+discord.on('MESSAGE_REACTION_ADD', async (event) => {
+  var channel = await discord.getGuildTextChannel(event.channelId);
+  var message = await channel.getMessage(event.messageId);
+  var embed = message.embeds[0];
+  if (
+    message.author.id == botID &&
+    event.userId != botID &&
+    embed.title.includes('Todo')
+  ) {
+    switch (event.emoji.name) {
+      case '✋':
+        console.log('raised hand');
+        if (embed.fields[2].value == 'unclaimed')
+          embed.fields[2].value = 'claimed';
+        embed.fields[1].value += event.member.user.username + ' ';
+        break;
+      case '✅':
+        console.log('checkmark');
+        embed.fields[2].value = 'done';
+        break;
+      case '❌':
+        console.log('X');
+        message.delete();
+        break;
+      default:
+        break;
+    }
+    message.edit(embed);
+  }
+});
+
+discord.on('MESSAGE_REACTION_REMOVE', async (event) => {
+  var channel = await discord.getGuildTextChannel(event.channelId);
+  var message = await channel.getMessage(event.messageId);
+  var embed = message.embeds[0];
+  if (
+    message.author.id == botID &&
+    event.userId != botID &&
+    embed.title.includes('Todo')
+  ) {
+    switch (event.emoji.name) {
+      case '✋':
+        console.log('raised hand');
+        embed.fields[1].value = embed.fields[1].value.replace(
+          event.member.user.username,
+          '​'
+        );
+        if (
+          message.reactions.find((reaction) => reaction.emoji.name === '✋')
+            .count <= 1 &&
+          embed.fields[2].value != 'done'
+        )
+          embed.fields[2].value = 'unclaimed';
+        break;
+      case '✅':
+        console.log('checkmark');
+        if (
+          message.reactions.find((reaction) => reaction.emoji.name === '✋')
+            .count <= 1
+        ) {
+          embed.fields[2].value = 'unclaimed';
+        } else {
+          embed.fields[2].value = 'claimed';
+        }
+
+        break;
+      case '❌':
+        console.log('X');
+        message.delete();
+        break;
+      default:
+        break;
+    }
+    message.edit(embed);
+  }
+});
