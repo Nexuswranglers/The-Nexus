@@ -10,6 +10,7 @@ const commands = new discord.command.CommandGroup({
   defaultPrefix: '?' // If you want a different Prefix for the bot, change this.
 });
 
+
 /**
  *
  * TICKETING STARTS HERE
@@ -172,6 +173,37 @@ commands.on(
     await message.delete();
   }
 );
+
+/**
+*
+*
+*
+* MUTE COMMAND
+*
+*
+*/
+
+commands.on(
+  {
+    name: 'mute',
+    filters: discord.command.filters.hasSomeRole([
+      '688555783813857292', //amdin
+      '688555756177326157', //mod
+      '696071561332916315' //bot wranglers
+    ])
+  },
+  (ctx) => ({
+    mutee: ctx.guildMember()
+  }),
+  async (message, { mutee }) => {
+    for (var id in mutee.roles) {
+      mutee.removeRole(mutee.roles[id]);
+    }
+    mutee.addRole('717363314791022634');
+  }
+);
+
+
 
 /**
  *
