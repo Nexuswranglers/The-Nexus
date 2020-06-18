@@ -10,7 +10,6 @@ const commands = new discord.command.CommandGroup({
   defaultPrefix: '?' // If you want a different Prefix for the bot, change this.
 });
 
-
 /**
  *
  * TICKETING STARTS HERE
@@ -64,12 +63,11 @@ commands.on(
       case 'moderator':
         ID = Support_ID.get('mods');
         break;
-
       //administrator team
       case 'admins':
       case 'admin':
       case 'administrator':
-      case 'administrator':
+      case 'administrators':
         ID = Support_ID.get('admins');
         break;
 
@@ -175,13 +173,13 @@ commands.on(
 );
 
 /**
-*
-*
-*
-* MUTE COMMAND
-*
-*
-*/
+ *
+ *
+ *
+ * MUTE COMMAND
+ *
+ *
+ */
 
 commands.on(
   {
@@ -189,7 +187,7 @@ commands.on(
     filters: discord.command.filters.hasSomeRole([
       '688555783813857292', //amdin
       '688555756177326157', //mod
-      '696071561332916315' //bot wranglers
+      '696071561332916315'
     ])
   },
   (ctx) => ({
@@ -199,11 +197,11 @@ commands.on(
     for (var id in mutee.roles) {
       mutee.removeRole(mutee.roles[id]);
     }
-    mutee.addRole('717363314791022634');
+    mutee.addRole('713653893275320330');
+    message.delete();
+    message.reply('User has been sent to the stockade!');
   }
 );
-
-
 
 /**
  *
@@ -233,6 +231,46 @@ function DefaultEmbed() {
   return default_embed;
 }
 
+commands.on(
+  {
+    name: 'makechannel',
+    filters: [
+      discord.command.filters.hasRole('696071561332916315'),
+      discord.command.filters.hasParentId('695042040832196629')
+    ]
+  },
+  (ctx) => ({
+    channel_name: ctx.text()
+  }),
+  async (message, { channel_name }) => {
+    var server = await message.getGuild();
+    server.createChannel({
+      name: channel_name,
+      type: 0,
+      parentId: await message.getChannel().then((channel) => {
+        return channel.parentId;
+      })
+    });
+  }
+);
+
+/*
+LEAVE THIS UNCOMMENTED UNLESS YOU WANT TO DELETE A CHANNEL
+DOES NOT ASK FOR CONFIRMATION, TRIPLE CHECK BEFORE YOU USE IT
+
+commands.on(
+  {
+    name: 'deletechannel',
+    filters: discord.command.filters.hasRole('696071561332916315')
+  },
+  (ctx) => ({}),
+  async (message) => {
+    message.getChannel().then((channel) => {
+      channel.delete();
+    });
+  }
+);
+*/
 let countKv = new pylon.KVNamespace('Todo');
 
 commands.on(
@@ -280,7 +318,6 @@ commands.on(
   }
 );
 
-//TODO properly implement promise handling for now just ignore the "might be null" warnings.
 discord.on('MESSAGE_REACTION_ADD', async (event) => {
   var channel = await discord.getGuildTextChannel(event.channelId);
   var message = await channel.getMessage(event.messageId);
